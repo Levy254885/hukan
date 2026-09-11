@@ -1,0 +1,192 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Hukan — clean, trustworthy, Kenyan marketplace */
+    --background: 210 20% 99%;
+    --foreground: 222 47% 11%;
+    --muted: 210 25% 96%;
+    --muted-foreground: 215 16% 46%;
+    --border: 214 20% 90%;
+    --input: 214 20% 90%;
+    --ring: 221 83% 53%;
+
+    --primary: 221 83% 53%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 210 25% 96%;
+    --secondary-foreground: 222 47% 11%;
+
+    --accent: 24 95% 53%;
+    --accent-foreground: 0 0% 100%;
+
+    --success: 142 71% 35%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    --danger: 0 72% 51%;
+    --danger-foreground: 0 0% 100%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --radius: 0.75rem;
+    --shadow-color: 222 47% 11%;
+  }
+
+  .dark {
+    --background: 222 47% 7%;
+    --foreground: 210 40% 98%;
+    --muted: 217 33% 14%;
+    --muted-foreground: 215 20% 65%;
+    --border: 217 25% 18%;
+    --input: 217 25% 18%;
+    --ring: 224 76% 58%;
+
+    --primary: 217 91% 60%;
+    --primary-foreground: 222 47% 11%;
+
+    --secondary: 217 33% 14%;
+    --secondary-foreground: 210 40% 98%;
+
+    --accent: 24 95% 53%;
+    --accent-foreground: 0 0% 100%;
+
+    --success: 142 71% 40%;
+    --success-foreground: 0 0% 100%;
+
+    --card: 222 47% 9%;
+    --card-foreground: 210 40% 98%;
+
+    --shadow-color: 0 0% 0%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1, "ss01" 1;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: hsl(var(--primary) / 0.18);
+    color: hsl(var(--foreground));
+  }
+
+  img {
+    @apply select-none;
+  }
+}
+
+@layer components {
+  .hukan-card {
+    @apply rounded-xl border border-border bg-card shadow-sm transition-all duration-300 ease-out;
+  }
+
+  .hukan-card-interactive {
+    @apply hukan-card hover:-translate-y-0.5 hover:border-primary/20 hover:shadow-lg;
+  }
+
+  .hukan-input {
+    @apply h-11 w-full rounded-lg border border-input bg-background px-3.5 text-sm shadow-sm transition-shadow duration-200
+      placeholder:text-muted-foreground
+      focus:border-primary/40 focus:outline-none focus:ring-2 focus:ring-ring/30;
+  }
+
+  .hukan-select {
+    @apply hukan-input appearance-none;
+  }
+
+  .hukan-section {
+    @apply mx-auto max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .hukan-chip {
+    @apply inline-flex items-center rounded-full border border-border bg-background px-3 py-1 text-sm font-medium
+      text-muted-foreground transition-colors duration-200 hover:border-primary/40 hover:text-foreground;
+  }
+
+  .hukan-page-enter {
+    animation: page-in 0.35s ease-out both;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .shadow-soft {
+    box-shadow:
+      0 1px 2px hsl(var(--shadow-color) / 0.04),
+      0 4px 16px hsl(var(--shadow-color) / 0.06);
+  }
+
+  .shadow-lift {
+    box-shadow:
+      0 4px 6px hsl(var(--shadow-color) / 0.04),
+      0 12px 28px hsl(var(--shadow-color) / 0.1);
+  }
+}
+
+:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted)) 25%,
+    hsl(var(--border)) 50%,
+    hsl(var(--muted)) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: calc(var(--radius) - 2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
