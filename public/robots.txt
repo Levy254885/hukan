@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /professional
+Disallow: /list-property
+Disallow: /messages
+Disallow: /signin
+Disallow: /signup
+
+Sitemap: https://hukan.co.ke/sitemap.xml
