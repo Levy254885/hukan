@@ -1,97 +1,146 @@
 /**
  * Agent subscription state — demo via localStorage.
- * Production: Stripe/M-Pesa webhook → Firestore subscription document.
+ * Production: M-Pesa/Stripe webhook → Firestore agent.subscription
  */
 
 import {
   AGENT_SUBSCRIPTION_PLANS,
   FREE_LISTING_LIMIT,
-  type SubscriptionPlanId,
   getPlan,
+  type SubscriptionPlan,
+  type SubscriptionPlanId,
 } from '@/config/monetization';
 
-const STORAGE_KEY = 'hukan_agent_subscriptions';
+const SUB_KEY = 'hukan_agent_subscriptions';
+const PUBLISHED_KEY = 'hukan_agent_listings';
 
 export interface AgentSubscription {
   agentId: string;
   planId: SubscriptionPlanId;
-  status: 'active' | 'cancelled' | 'past_due';
-  currentPeriodEnd: string | null; // ISO
-  listingLimit: number | null;
-  featuredCreditsRemaining: number;
+  status: 'active' | 'cancelled' | 'expired';
+  startedAt: string;
+  expiresAt: string | null;
+  demoActivated?: boolean;
   updatedAt: string;
+}
+
+export interface ListingQuota {
+  plan: SubscriptionPlan;
+  subscription: AgentSubscription;
+  activeListings: number;
+  limit: number | null;
+  remaining: number | null;
+  canPublish: boolean;
+  isPaid: boolean;
 }
 
 function loadAll(): Record<string, AgentSubscription> {
   if (typeof window === 'undefined') return {};
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : {};
+    return JSON.parse(localStorage.getItem(SUB_KEY) || '{}');
   } catch {
     return {};
   }
 }
 
-function saveAll(data: Record<string, AgentSubscription>) {
+function saveAll(map: Record<string, AgentSubscription>) {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  localStorage.setItem(SUB_KEY, JSON.stringify(map));
 }
 
-export function getSubscription(agentId: string): AgentSubscription {
-  const all = loadAll();
-  if (all[agentId]) return all[agentId];
-  // Default free
+function defaultFree(agentId: string): AgentSubscription {
   return {
     agentId,
     planId: 'free',
     status: 'active',
-    currentPeriodEnd: null,
-    listingLimit: FREE_LISTING_LIMIT,
-    featuredCreditsRemaining: 0,
+    startedAt: new Date().toISOString(),
+    expiresAt: null,
     updatedAt: new Date().toISOString(),
   };
 }
 
-export function getListingQuota(agentId: string): {
-  limit: number | null;
-  used: number;
-  remaining: number | null;
-  planId: SubscriptionPlanId;
-  canPublish: boolean;
-} {
-  const sub = getSubscription(agentId);
-  // used is supplied by caller or listingService — here we only return plan limit
+function isExpired(sub: AgentSubscription): boolean {
+  if (!sub.expiresAt) return false;
+  return new Date(sub.expiresAt).getTime() < Date.now();
+}
+
+function countActiveListings(agentId: string): number {
+  if (typeof window === 'undefined') return 0;
+  try {
+    const raw = JSON.parse(localStorage.getItem(PUBLISHED_KEY) || '[]');
+    return raw.filter(
+      (p: { agentId?: string; status?: string }) =>
+        p.agentId === agentId &&
+        (p.status === 'published' || p.status === 'pending_review')
+    ).length;
+  } catch {
+    return 0;
+  }
+}
+
+export async function getAgentSubscription(agentId: string): Promise<AgentSubscription> {
+  const all = loadAll();
+  let sub = all[agentId] || defaultFree(agentId);
+
+  if (sub.planId !== 'free' && isExpired(sub)) {
+    sub = {
+      ...defaultFree(agentId),
+      updatedAt: new Date().toISOString(),
+    };
+    all[agentId] = sub;
+    saveAll(all);
+  }
+
+  if (!all[agentId]) {
+    all[agentId] = sub;
+    saveAll(all);
+  }
+
+  return sub;
+}
+
+export async function getListingQuota(agentId: string): Promise<ListingQuota> {
+  const subscription = await getAgentSubscription(agentId);
+  const plan = getPlan(subscription.planId);
+  const activeListings = countActiveListings(agentId);
+  const limit = plan.listingLimit;
+  const remaining = limit == null ? null : Math.max(0, limit - activeListings);
+  const canPublish = limit == null ? true : activeListings < limit;
+  const isPaid = subscription.planId !== 'free' && subscription.status === 'active';
+
   return {
-    limit: sub.listingLimit,
-    used: 0, // listingService fills real count
-    remaining: sub.listingLimit,
-    planId: sub.planId,
-    canPublish: true,
+    plan,
+    subscription,
+    activeListings,
+    limit,
+    remaining,
+    canPublish,
+    isPaid,
   };
 }
 
-/** Activate or change plan (demo — no payment) */
-export function activateSubscription(
+export async function activateSubscription(
   agentId: string,
-  planId: SubscriptionPlanId
-): AgentSubscription {
+  planId: 'monthly' | 'annual'
+): Promise<AgentSubscription> {
   const plan = getPlan(planId);
-  const periodEnd =
-    plan.interval === 'none'
-      ? null
-      : new Date(
-          Date.now() +
-            (plan.interval === 'month' ? 30 : 365) * 24 * 60 * 60 * 1000
-        ).toISOString();
+  const now = new Date();
+  const expires = new Date(now);
+
+  if (plan.interval === 'month') {
+    expires.setMonth(expires.getMonth() + 1);
+  } else if (plan.interval === 'year') {
+    expires.setFullYear(expires.getFullYear() + 1);
+  }
 
   const sub: AgentSubscription = {
     agentId,
     planId,
     status: 'active',
-    currentPeriodEnd: periodEnd,
-    listingLimit: plan.listingLimit,
-    featuredCreditsRemaining: plan.featuredCredits,
-    updatedAt: new Date().toISOString(),
+    startedAt: now.toISOString(),
+    expiresAt: expires.toISOString(),
+    demoActivated: true,
+    updatedAt: now.toISOString(),
   };
 
   const all = loadAll();
@@ -100,27 +149,54 @@ export function activateSubscription(
   return sub;
 }
 
-export function canPublishListing(agentId: string, currentActiveCount: number): {
-  allowed: boolean;
-  reason?: string;
-  limit: number | null;
-  planId: SubscriptionPlanId;
-} {
-  const sub = getSubscription(agentId);
-  if (sub.listingLimit === null) {
-    return { allowed: true, limit: null, planId: sub.planId };
+export async function cancelSubscription(agentId: string): Promise<AgentSubscription> {
+  const all = loadAll();
+  const sub = all[agentId] || defaultFree(agentId);
+  const next: AgentSubscription = {
+    ...sub,
+    status: sub.expiresAt ? 'cancelled' : 'active',
+    planId: sub.expiresAt ? sub.planId : 'free',
+    updatedAt: new Date().toISOString(),
+  };
+  if (!sub.expiresAt) {
+    next.planId = 'free';
+    next.status = 'active';
+    next.expiresAt = null;
   }
-  if (currentActiveCount >= sub.listingLimit) {
-    return {
-      allowed: false,
-      reason: `Free plan allows ${sub.listingLimit} active listings. Upgrade to Pro for unlimited.`,
-      limit: sub.listingLimit,
-      planId: sub.planId,
-    };
-  }
-  return { allowed: true, limit: sub.listingLimit, planId: sub.planId };
+  all[agentId] = next;
+  saveAll(all);
+  return next;
 }
 
-export function listPlans() {
+export async function downgradeToFree(agentId: string): Promise<AgentSubscription> {
+  const sub = defaultFree(agentId);
+  const all = loadAll();
+  all[agentId] = sub;
+  saveAll(all);
+  return sub;
+}
+
+export function listPublicPlans(): SubscriptionPlan[] {
   return AGENT_SUBSCRIPTION_PLANS;
 }
+
+export function canPublishListing(
+  agentId: string,
+  currentActiveCount: number
+): { allowed: boolean; reason?: string; limit: number | null; planId: SubscriptionPlanId } {
+  // Sync helper for callers that already have a count
+  void agentId;
+  const plan = getPlan('free');
+  // Prefer checking via getListingQuota in UI; this is a lightweight fallback
+  if (plan.listingLimit != null && currentActiveCount >= plan.listingLimit) {
+    return {
+      allowed: false,
+      reason: `Free plan allows ${plan.listingLimit} active listings. Upgrade to Pro for unlimited.`,
+      limit: plan.listingLimit,
+      planId: 'free',
+    };
+  }
+  return { allowed: true, limit: plan.listingLimit, planId: 'free' };
+}
+
+export { FREE_LISTING_LIMIT };
