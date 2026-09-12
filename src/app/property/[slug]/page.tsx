@@ -86,19 +86,22 @@ export default async function PropertyPage({ params }: PropertyPageProps) {
 
   const countySlug = slugifyPlace(property.location.county);
   const areaSlug = property.location.area ? slugifyPlace(property.location.area) : null;
+  const intent = property.purpose === 'rent' ? 'rent' : 'sale';
   const crumbs = [
-    { name: 'Home', path: '/' },
+    { label: 'Home', href: '/' },
     {
-      name: property.location.county,
-      path: `/${countySlug}/property-for-${property.purpose === 'rent' ? 'rent' : 'sale'}`,
+      label: property.location.county,
+      href: `/${countySlug}/property-for-${intent}`,
     },
     ...(property.location.area && areaSlug
-      ? [{
-          name: property.location.area,
-          path: `/${countySlug}/${areaSlug}/property-for-${property.purpose === 'rent' ? 'rent' : 'sale'}`,
-        }]
+      ? [
+          {
+            label: property.location.area,
+            href: `/${countySlug}/${areaSlug}/property-for-${intent}`,
+          },
+        ]
       : []),
-    { name: property.title, path: `/property/${property.slug}` },
+    { label: property.title },
   ];
 
   return (
