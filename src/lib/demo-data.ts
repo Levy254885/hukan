@@ -346,6 +346,11 @@ export const DEMO_PROPERTIES: Property[] = [
   },
 ];
 
+/** Alias used by propertyService / listingService */
+export function getDemoProperties(): Property[] {
+  return DEMO_PROPERTIES;
+}
+
 export function filterDemoProperties(filters: {
   purpose?: string;
   location?: string;
