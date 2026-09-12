@@ -138,29 +138,36 @@ export default async function SeoLandingPage({ params }: Props) {
   }
 
   const ranked = rankProperties(filtered, {
-    purpose: landing.purpose === 'land' || landing.purpose === 'commercial' ? undefined : landing.purpose,
+    purpose:
+      landing.purpose === 'land' || landing.purpose === 'commercial'
+        ? undefined
+        : landing.purpose,
     location: area || county,
   })
     .slice(0, 24)
     .map((r) => r.property);
 
   const crumbs = [
-    { name: 'Home', path: '/' },
-    {
-      name: county,
-      path: `/${countySlug}/property-for-sale`,
-    },
+    { label: 'Home', href: '/' },
+    { label: county, href: `/${countySlug}/property-for-sale` },
   ];
   if (area) {
-    crumbs.push({ name: area, path });
+    crumbs.push({ label: area, href: path });
   }
-  crumbs.push({ name: landing.h1Template(placeLabel), path });
+  crumbs.push({ label: landing.h1Template(placeLabel) });
+
+  const schemaCrumbs = [
+    { name: 'Home', path: '/' },
+    { name: county, path: `/${countySlug}/property-for-sale` },
+    ...(area ? [{ name: area, path }] : []),
+    { name: landing.h1Template(placeLabel), path },
+  ];
 
   return (
     <div className="hukan-section py-8">
       <JsonLd
         data={[
-          breadcrumbListSchema(crumbs),
+          breadcrumbListSchema(schemaCrumbs),
           collectionPageSchema({
             name: title,
             description,
