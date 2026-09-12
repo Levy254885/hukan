@@ -22,102 +22,124 @@ interface Props {
   params: Promise<{ segments: string[] }>;
 }
 
+interface ResolvedSeo {
+  county: string;
+  countySlug: string;
+  area?: string;
+  areaSlug?: string;
+  landing: SeoLandingDef;
+  placeLabel: string;
+  path: string;
+}
+
+function resolveSegments(segments: string[]): ResolvedSeo | null {
+  if (segments.length === 2) {
+    const [countySlug, intentSlug] = segments;
+    const county = findCounty(countySlug);
+    const landing = findLanding(intentSlug);
+    if (!county || !landing) return null;
+    return {
+      county,
+      countySlug,
+      landing,
+      placeLabel: county,
+      path: `/${countySlug}/${intentSlug}`,
+    };
+  }
+
+  if (segments.length === 3) {
+    const [countySlug, areaSlug, intentSlug] = segments;
+    const place = findArea(countySlug, areaSlug);
+    const landing = findLanding(intentSlug);
+    if (!place || !landing) return null;
+    return {
+      county: place.county,
+      countySlug,
+      area: place.area,
+      areaSlug,
+      landing,
+      placeLabel: `${place.area}, ${place.county}`,
+      path: `/${countySlug}/${areaSlug}/${intentSlug}`,
+    };
+  }
+
+  return null;
+}
+
 export async function generateStaticParams() {
   const params: { segments: string[] }[] = [];
-  for (const landing of SEO_LANDINGS) {
-    params.push({ segments: landing.path.split('/').filter(Boolean) });
-  }
+
   for (const place of SEO_PRIORITY_PLACES) {
-    const slug = slugifyPlace(place.name);
-    params.push({ segments: [slug] });
-    params.push({ segments: [slug, 'for-sale'] });
-    params.push({ segments: [slug, 'to-rent'] });
+    const countySlug = slugifyPlace(place.county);
+    for (const landing of SEO_LANDINGS) {
+      params.push({ segments: [countySlug, landing.slug] });
+      for (const area of place.areas) {
+        params.push({
+          segments: [countySlug, slugifyPlace(area), landing.slug],
+        });
+      }
+    }
   }
+
   return params;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { segments } = await params;
-  const path = '/' + segments.join('/');
-  const landing = findLanding(path);
-  if (landing) {
-    return buildPageMetadata({
-      title: landing.title,
-      description: landing.description,
-      path,
-    });
-  }
-  const county = findCounty(segments[0]);
-  if (county) {
-    const intent = segments[1];
-    const label =
-      intent === 'to-rent' ? 'to rent' : intent === 'for-sale' ? 'for sale' : 'properties';
-    return buildPageMetadata({
-      title: `Properties ${label} in ${county.name}`,
-      description: `Browse houses, apartments and land ${label} in ${county.name} County, Kenya. Verified listings on Hukan.`,
-      path,
-    });
-  }
-  return { title: 'Properties in Kenya' };
+  const resolved = resolveSegments(segments);
+  if (!resolved) return { title: 'Properties in Kenya' };
+
+  const { landing, placeLabel, path } = resolved;
+  return buildPageMetadata({
+    title: landing.titleTemplate(placeLabel),
+    description: landing.descriptionTemplate(placeLabel),
+    path,
+  });
 }
 
 export default async function SeoLandingPage({ params }: Props) {
   const { segments } = await params;
-  const path = '/' + segments.join('/');
-  let landing: SeoLandingDef | undefined = findLanding(path);
-  let title = '';
-  let description = '';
-  let countyName = '';
-  let areaName = '';
-  let purpose: 'buy' | 'rent' | undefined;
+  const resolved = resolveSegments(segments);
+  if (!resolved) notFound();
 
-  if (landing) {
-    title = landing.h1;
-    description = landing.description;
-    countyName = landing.county || '';
-    areaName = landing.area || '';
-    purpose = landing.purpose;
-  } else {
-    const county = findCounty(segments[0]);
-    if (!county) notFound();
-    countyName = county.name;
-    const intent = segments[1];
-    if (intent === 'to-rent') purpose = 'rent';
-    else if (intent === 'for-sale') purpose = 'buy';
-    const label = purpose === 'rent' ? 'to rent' : purpose === 'buy' ? 'for sale' : '';
-    title = `Properties ${label} in ${countyName}`;
-    description = `Discover verified properties ${label} across ${countyName} County.`;
-    const area = segments[2] ? findArea(segments[2]) : undefined;
-    if (area) {
-      areaName = area.name;
-      title = `Properties ${label} in ${areaName}, ${countyName}`;
-    }
-  }
+  const { county, countySlug, area, landing, placeLabel, path } = resolved;
+  const title = landing.h1Template(placeLabel);
+  const description = landing.descriptionTemplate(placeLabel);
 
   const all = getDemoProperties();
   let filtered = all.filter((p) => p.status === 'published');
-  if (countyName) {
-    filtered = filtered.filter(
-      (p) => p.location.county.toLowerCase() === countyName.toLowerCase()
-    );
-  }
-  if (areaName) {
+
+  filtered = filtered.filter(
+    (p) => p.location.county.toLowerCase() === county.toLowerCase()
+  );
+
+  if (area) {
     filtered = filtered.filter(
       (p) =>
-        (p.location.area || '').toLowerCase().includes(areaName.toLowerCase()) ||
-        (p.location.city || '').toLowerCase().includes(areaName.toLowerCase())
+        (p.location.area || '').toLowerCase().includes(area.toLowerCase()) ||
+        (p.location.city || '').toLowerCase().includes(area.toLowerCase())
     );
   }
-  if (purpose === 'buy') {
-    filtered = filtered.filter((p) => p.purpose === 'buy' || p.purpose === 'land');
-  }
-  if (purpose === 'rent') {
+
+  if (landing.purpose === 'buy') {
+    filtered = filtered.filter((p) => p.purpose === 'buy');
+  } else if (landing.purpose === 'rent') {
     filtered = filtered.filter((p) => p.purpose === 'rent');
+  } else if (landing.purpose === 'land') {
+    filtered = filtered.filter((p) => p.purpose === 'land');
+  } else if (landing.purpose === 'commercial') {
+    filtered = filtered.filter((p) => p.purpose === 'commercial');
+  }
+
+  if (landing.propertyTypes?.length) {
+    filtered = filtered.filter((p) =>
+      landing.propertyTypes!.includes(p.propertyType)
+    );
   }
 
   const ranked = rankProperties(filtered, {
-    purpose,
-    location: areaName || countyName || undefined,
+    purpose: landing.purpose === 'land' || landing.purpose === 'commercial' ? undefined : landing.purpose,
+    location: area || county,
   })
     .slice(0, 24)
     .map((r) => r.property);
@@ -125,14 +147,14 @@ export default async function SeoLandingPage({ params }: Props) {
   const crumbs = [
     { name: 'Home', path: '/' },
     {
-      name: countyName || 'Kenya',
-      path: countyName ? `/${slugifyPlace(countyName)}` : '/search',
+      name: county,
+      path: `/${countySlug}/property-for-sale`,
     },
   ];
-  if (areaName) crumbs.push({ name: areaName, path });
-  else if (purpose) {
-    crumbs.push({ name: purpose === 'rent' ? 'To rent' : 'For sale', path });
+  if (area) {
+    crumbs.push({ name: area, path });
   }
+  crumbs.push({ name: landing.h1Template(placeLabel), path });
 
   return (
     <div className="hukan-section py-8">
@@ -147,8 +169,10 @@ export default async function SeoLandingPage({ params }: Props) {
         ]}
       />
       <Breadcrumbs items={crumbs} />
-      <header className="mt-4 mb-8">
-        <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">{title}</h1>
+      <header className="mb-8 mt-4">
+        <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
+          {title}
+        </h1>
         <p className="mt-3 max-w-2xl text-muted-foreground">{description}</p>
         <p className="mt-2 text-sm text-muted-foreground">{ranked.length} properties</p>
       </header>
@@ -156,7 +180,10 @@ export default async function SeoLandingPage({ params }: Props) {
       {ranked.length === 0 ? (
         <div className="rounded-xl border border-border bg-card p-12 text-center">
           <p className="text-muted-foreground">No listings match this area yet.</p>
-          <Link href="/search" className="mt-4 inline-block font-medium text-primary hover:underline">
+          <Link
+            href="/search"
+            className="mt-4 inline-block font-medium text-primary hover:underline"
+          >
             Browse all properties →
           </Link>
         </div>
@@ -174,16 +201,12 @@ export default async function SeoLandingPage({ params }: Props) {
           <Link href="/search" className="hukan-chip">
             All search
           </Link>
-          {countyName && (
-            <>
-              <Link href={`/${slugifyPlace(countyName)}/for-sale`} className="hukan-chip">
-                {countyName} for sale
-              </Link>
-              <Link href={`/${slugifyPlace(countyName)}/to-rent`} className="hukan-chip">
-                {countyName} to rent
-              </Link>
-            </>
-          )}
+          <Link href={`/${countySlug}/property-for-sale`} className="hukan-chip">
+            {county} for sale
+          </Link>
+          <Link href={`/${countySlug}/property-for-rent`} className="hukan-chip">
+            {county} to rent
+          </Link>
         </div>
       </section>
     </div>
