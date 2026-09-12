@@ -99,7 +99,8 @@ export async function signUpWithEmail(
   role: UserRole = 'buyer'
 ): Promise<AuthUser> {
   if (password.length < 8) {
-    throw new Error('Password must be at least 8 characters');\n  }
+    throw new Error('Password must be at least 8 characters');
+  }
 
   const key = email.toLowerCase().trim();
   if (DEMO_USERS[key]) {
