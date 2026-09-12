@@ -50,7 +50,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const county = findCounty(segments[0]);
   if (county) {
     const intent = segments[1];
-    const label = intent === 'to-rent' ? 'to rent' : intent === 'for-sale' ? 'for sale' : 'properties';
+    const label =
+      intent === 'to-rent' ? 'to rent' : intent === 'for-sale' ? 'for sale' : 'properties';
     return buildPageMetadata({
       title: `Properties ${label} in ${county.name}`,
       description: `Browse houses, apartments and land ${label} in ${county.name} County, Kenya. Verified listings on Hukan.`,
@@ -107,17 +108,31 @@ export default async function SeoLandingPage({ params }: Props) {
         (p.location.city || '').toLowerCase().includes(areaName.toLowerCase())
     );
   }
-  if (purpose === 'buy') filtered = filtered.filter((p) => p.purpose === 'buy' || p.purpose === 'land');
-  if (purpose === 'rent') filtered = filtered.filter((p) => p.purpose === 'rent');
+  if (purpose === 'buy') {
+    filtered = filtered.filter((p) => p.purpose === 'buy' || p.purpose === 'land');
+  }
+  if (purpose === 'rent') {
+    filtered = filtered.filter((p) => p.purpose === 'rent');
+  }
 
-  const ranked = rankProperties(filtered).slice(0, 24);
+  const ranked = rankProperties(filtered, {
+    purpose,
+    location: areaName || countyName || undefined,
+  })
+    .slice(0, 24)
+    .map((r) => r.property);
 
   const crumbs = [
-    { name: 'Home', href: '/' },
-    { name: countyName || 'Kenya', href: countyName ? `/${slugifyPlace(countyName)}` : '/search' },
+    { name: 'Home', path: '/' },
+    {
+      name: countyName || 'Kenya',
+      path: countyName ? `/${slugifyPlace(countyName)}` : '/search',
+    },
   ];
-  if (areaName) crumbs.push({ name: areaName, href: path });
-  else if (purpose) crumbs.push({ name: purpose === 'rent' ? 'To rent' : 'For sale', href: path });
+  if (areaName) crumbs.push({ name: areaName, path });
+  else if (purpose) {
+    crumbs.push({ name: purpose === 'rent' ? 'To rent' : 'For sale', path });
+  }
 
   return (
     <div className="hukan-section py-8">
@@ -141,7 +156,7 @@ export default async function SeoLandingPage({ params }: Props) {
       {ranked.length === 0 ? (
         <div className="rounded-xl border border-border bg-card p-12 text-center">
           <p className="text-muted-foreground">No listings match this area yet.</p>
-          <Link href="/search" className="mt-4 inline-block text-primary font-medium hover:underline">
+          <Link href="/search" className="mt-4 inline-block font-medium text-primary hover:underline">
             Browse all properties →
           </Link>
         </div>
@@ -156,7 +171,9 @@ export default async function SeoLandingPage({ params }: Props) {
       <section className="mt-12 rounded-xl border border-border bg-muted/40 p-6">
         <h2 className="text-lg font-semibold">Explore more</h2>
         <div className="mt-4 flex flex-wrap gap-2">
-          <Link href="/search" className="hukan-chip">All search</Link>
+          <Link href="/search" className="hukan-chip">
+            All search
+          </Link>
           {countyName && (
             <>
               <Link href={`/${slugifyPlace(countyName)}/for-sale`} className="hukan-chip">
