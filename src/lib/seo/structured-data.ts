@@ -4,7 +4,6 @@
  */
 
 import type { Property } from '@/types';
-import { formatPrice } from '@/lib/utils';
 import { absoluteUrl } from './metadata';
 import { getSiteUrl, SITE_NAME, SITE_TAGLINE } from './config';
 
@@ -44,7 +43,7 @@ export function websiteSchema() {
   };
 }
 
-export function breadcrumbSchema(items: { name: string; path: string }[]) {
+export function breadcrumbSchema(items: { name: string; path?: string; href?: string }[]) {
   return {
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
@@ -52,8 +51,30 @@ export function breadcrumbSchema(items: { name: string; path: string }[]) {
       '@type': 'ListItem',
       position: index + 1,
       name: item.name,
-      item: absoluteUrl(item.path),
+      item: absoluteUrl(item.path || item.href || '/'),
     })),
+  };
+}
+
+/** Alias used by SEO landing pages */
+export const breadcrumbListSchema = breadcrumbSchema;
+
+export function collectionPageSchema(input: {
+  name: string;
+  description?: string;
+  url: string;
+}) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'CollectionPage',
+    name: input.name,
+    description: input.description,
+    url: input.url,
+    isPartOf: {
+      '@type': 'WebSite',
+      name: SITE_NAME,
+      url: getSiteUrl(),
+    },
   };
 }
 
