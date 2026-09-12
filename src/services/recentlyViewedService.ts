@@ -34,11 +34,19 @@ function save(userId: string, records: ViewRecord[]) {
   }
 }
 
-export function trackView(userId: string | undefined, propertyId: string) {
+export function trackView(userId: string | undefined | null, propertyId: string) {
   if (!userId) return;
   const existing = load(userId).filter((r) => r.propertyId !== propertyId);
   existing.unshift({ propertyId, viewedAt: new Date().toISOString() });
   save(userId, existing);
+}
+
+/** Alias used by TrackView component */
+export async function trackPropertyView(
+  userId: string | null | undefined,
+  propertyId: string
+): Promise<void> {
+  trackView(userId, propertyId);
 }
 
 export async function getRecentlyViewed(
