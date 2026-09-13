@@ -70,7 +70,6 @@ export const DEMO_PROPERTIES: Property[] = [
       },
     ],
     featured: true,
-    featuredUntil: null,
     views: 342,
     saves: 28,
     enquiries: 12,
