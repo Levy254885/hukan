@@ -12,7 +12,7 @@ import {
 } from '@/lib/seo/config';
 import { buildPageMetadata } from '@/lib/seo/metadata';
 import { JsonLd } from '@/components/seo/JsonLd';
-import { Breadcrumbs } from '@/components/seo/Breadcrumbs';
+import { Breadcrumbs, type Crumb } from '@/components/seo/Breadcrumbs';
 import { PropertyCard } from '@/components/property/PropertyCard';
 import { getDemoProperties } from '@/lib/demo-data';
 import { rankProperties } from '@/lib/seo/ranking';
@@ -147,7 +147,7 @@ export default async function SeoLandingPage({ params }: Props) {
     .slice(0, 24)
     .map((r) => r.property);
 
-  const crumbs = [
+  const crumbs: Crumb[] = [
     { label: 'Home', href: '/' },
     { label: county, href: `/${countySlug}/property-for-sale` },
   ];
