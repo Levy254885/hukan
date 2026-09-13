@@ -171,6 +171,7 @@ export interface Property {
   availableFrom?: string;
   yearBuilt?: number;
   floors?: number;
+  keywords?: string[];
   createdAt: Date;
   updatedAt: Date;
   publishedAt?: Date;
